@@ -45,7 +45,7 @@ func main() {
 	}
 	defer handle.Close()
 
-	handle.SetBPFFilter("tcp port 80")
+	handle.SetBPFFilter("not tcp port 2222 and not tcp port 22")
 
 	pmux = &PMux{pubsub.New(5), handle}
 	go pmux.publish()
@@ -54,12 +54,14 @@ func main() {
 	s := &ssh.Server{
 		Addr:             ":2222",
 		Handler:          sessionHandler,
-		PublicKeyHandler: publicKeyHandler,
-		PasswordHandler:  passwordHandler,
+		PublicKeyHandler: func(ctx ssh.Context, key ssh.PublicKey) bool { return true },
+		PtyCallback:      func(ctx ssh.Context, pty ssh.Pty) bool { return false },
+		PasswordHandler:  func(ctx ssh.Context, pass string) bool { return true },
 	}
 
-	log.Fatal(s.ListenAndServe())
+	ssh.HostKeyFile("/etc/ssh/ssh_host_rsa_key")(s)
 
+	log.Fatal(s.ListenAndServe())
 }
 
 // Copy packets from the capture buffer to the pubsub
@@ -90,7 +92,12 @@ func sessionHandler(s ssh.Session) {
 	// Write packets out over the SSH session
 	for packet := range output {
 		log.Println("writing a packet:", packet.(*Packet).ci.CaptureLength, len(packet.(*Packet).data))
-		writer.WritePacket(packet.(*Packet).ci, packet.(*Packet).data)
+		err := writer.WritePacket(packet.(*Packet).ci, packet.(*Packet).data)
+		if err != nil {
+			log.Println(err)
+			pmux.ps.Unsub(sub, "packets")
+			s.Exit(0)
+		}
 	}
 }
 
