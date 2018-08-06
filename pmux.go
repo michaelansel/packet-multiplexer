@@ -24,6 +24,7 @@ var pmux *PMux
 func main() {
 
 	deviceName := os.Args[1]
+	serverPassword := os.Args[2]
 
 	inactive, err := pcap.NewInactiveHandle(deviceName)
 	if err != nil {
@@ -54,9 +55,9 @@ func main() {
 	s := &ssh.Server{
 		Addr:             ":2222",
 		Handler:          sessionHandler,
-		PublicKeyHandler: func(ctx ssh.Context, key ssh.PublicKey) bool { return true },
+		PublicKeyHandler: func(ctx ssh.Context, key ssh.PublicKey) bool { return false },
 		PtyCallback:      func(ctx ssh.Context, pty ssh.Pty) bool { return false },
-		PasswordHandler:  func(ctx ssh.Context, pass string) bool { return true },
+		PasswordHandler:  func(ctx ssh.Context, pass string) bool { return pass == serverPassword },
 	}
 
 	ssh.HostKeyFile("/etc/ssh/ssh_host_rsa_key")(s)
