@@ -48,8 +48,9 @@ func main() {
 
 	handle.SetBPFFilter("not tcp port 2222 and not tcp port 22")
 
-	pmux = &PMux{pubsub.New(5), handle}
+	pmux = &PMux{pubsub.New(100), handle}
 	go pmux.publish()
+	// Save a copy locally
 	// go localCapture()
 
 	s := &ssh.Server{
@@ -86,7 +87,7 @@ func sessionHandler(s ssh.Session) {
 	sub := pmux.ps.Sub("packets")
 
 	// RingBuffer the subscription
-	output := make(chan interface{}, 5)
+	output := make(chan interface{}, 100)
 	rb := NewRingBuffer(sub, output)
 	go rb.Run()
 
@@ -102,6 +103,7 @@ func sessionHandler(s ssh.Session) {
 	}
 }
 
+// Save a copy locally
 func localCapture() {
 	f, _ := os.Create("/tmp/file.pcap")
 	writer := pcapgo.NewWriter(f)
